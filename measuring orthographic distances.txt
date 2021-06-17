@@ -1,0 +1,187 @@
+import os
+import pandas as pd
+from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageStat
+from itertools import combinations
+import functools
+import math
+import itertools
+import pandas as pd
+from scipy import stats
+
+def count_black_pixels(img):
+    pixels = list(img.getdata())
+    return len(list(filter(lambda rgb: sum(rgb)== 0, pixels)))
+
+font=ImageFont.truetype(r'C:\Windows\Fonts_eng\arial.ttf',100)
+letter=u'\U00010450'
+
+img= Image.new('RGB', (100,100), 'white')
+draw = ImageDraw.Draw(img)
+draw.text((0,0), letter, font=font, fill=(0,0,0))
+img.show()
+
+
+#alphabet = 'abcdefghijklmnoprstuvwyz'
+alphabet = 'ABCDEFGHIJKLMNOPRSTUVWYZ'
+    
+ def draw_letter(letter, font, save=True):
+     img = Image.new('RGB', (100,100), 'white')
+    
+     draw = ImageDraw.Draw(img)
+     draw.text((0,0), letter, font=font, fill=(0,0,0))
+    
+     return img
+
+def perimetricComplexity(img):
+    img = img
+    
+    offsets1 = [x for x in itertools.product([-1,1,0], repeat=2) if x != (0,0)]
+    offsets2 = [x for x in offsets1 if abs(x[0]-x[1]) == 1]
+
+    # Get 1-pixel perimeter
+    offsets = []
+    offsets.append(img)
+    for x_offset, y_offset in offsets1:
+        offsets.append(ImageChops.offset(img, x_offset, y_offset))
+    composite = functools.reduce(lambda x,y: ImageChops.darker(x, y), offsets)
+    perimeter = ImageChops.subtract(img,composite)
+    perimeter = ImageChops.invert(perimeter)
+
+    # Thicken perimeter to 3 pixels
+    offsets = []
+    for x_offset, y_offset in offsets2:
+        offsets.append(ImageChops.offset(perimeter, x_offset, y_offset))
+    composite = functools.reduce(lambda x,y: ImageChops.darker(x, y), offsets)
+    composite = ImageChops.invert(composite)
+    perimeter = ImageStat.Stat(composite).sum[0]/(255*3) #adjusting for the fact that 255 is the max value in the RGB color system, and that we'd thickened the perimeter to 3 pixels
+
+    # Calculate ink area
+    img = ImageChops.invert(img)
+    inkArea = ImageStat.Stat(img).sum[0]/255 #adjusting for the fact that 255 is the max value in the RGB color system
+    PC = perimeter**2/(inkArea*4*math.pi)
+    
+    return(PC)
+
+def available_fonts():
+    fontdir = 'C:\Windows\Fonts_eng'
+    for root, dirs, filenames in os.walk(fontdir):
+        for name in filenames:
+            path = os.path.join(root, name)
+            try:
+                yield ImageFont.truetype(path, 100)
+            except IOError:
+                pass
+fontlist=[]            
+fontdir = 'C:\Windows\Fonts_eng'
+for root, dirs, filenames in os.walk(fontdir):
+    for name in filenames:
+        path = os.path.join(root, name)
+        fontlist.append(path)
+        
+for j in fontlist:
+    if j.endswith('fon'):
+        fontlist.remove(j)
+         
+
+ for letter in alphabet:
+     for font in available_fonts():
+         img = draw_letter(letter, font, save=True)
+         res = perimetricComplexity(img)
+         fontname.append(font)
+         letters.append(letter)
+         result.append(res)
+
+ df=pd.DataFrame([fontname,result,letters]).transpose()
+      
+    
+os.chdir(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_upper\data_pelli')
+
+alphabet = 'abcdefghijklmnoprstuvwyz'
+      
+fon=[]           
+let=[]
+pelli=[]
+for i in fontlist:   
+    font=ImageFont.truetype(i,100)
+    fon.append(i)
+    
+    for alph in alphabet:
+        img = Image.new('RGB', (100,100), 'white')
+        draw = ImageDraw.Draw(img)
+        draw.text((0,0), alph, font=font, fill=(0,0,0))
+    
+        res = perimetricComplexity(img)
+        let.append(alph)
+        pelli.append(res)
+        
+df=pd.DataFrame([let,pelli]).transpose()
+
+fon2=[]    
+for i in range(len(fon)):
+    j = 24
+    while j != 0:
+        fon2.append(fon[i])
+        j-=1
+
+df['font']=fon2
+    
+os.chdir(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_upper\data_pelli')
+
+uni=df['font'].to_list()
+uni=set(uni)
+for i in set(uni):
+    df2=df.loc[df['font']==i]    
+    df2.to_excel(i[21:-4] + '.xlsx', engine='xlsxwriter')
+
+
+directory=r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_upper\data_pelli'
+os.chdir(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_upper\data_pelli')
+
+for filename in os.listdir():
+    if filename.endswith('xlsx'):
+        f=pd.read_excel(filename)
+        #print(f.iloc[[1,2]])
+        let=f[0].to_list()
+        pel=f[1].to_list()
+        
+        let_com=list(combinations(let,2))
+        pel_com=list(combinations(pel,2))
+        
+        let_dif=pd.DataFrame(let_com, columns=['let1','let2'])
+        pel_dif=pd.DataFrame(pel_com, columns=['pel1','pel2'])
+        
+        pel_dif['pel_diff']=pel_dif.apply(lambda row:abs(row['pel1']-row['pel2']), axis=1)
+        
+        filename2='combi_' + filename
+        df2=pd.concat([let_dif,pel_dif], axis=1)
+        df2.to_excel(filename2, engine='xlsxwriter')
+        
+        #print(filename2)
+    
+phone=pd.read_excel(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_lower\combi_phono.xlsx')
+df3=phone['edit'] 
+
+os.chdir(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_lower\data_pelli\combi')       
+        
+cor=[]
+file=[]
+for filename in os.listdir():
+    if filename.endswith('xlsx'):
+        
+        g=pd.read_excel(filename, encoding='utf-8')
+        fin=pd.concat([g,df3], axis=1)
+        
+        cors=stats.pearsonr(fin['pel_diff'].to_list(),fin['edit'].to_list())
+        cor.append(cors)
+        file.append(filename[:-4])
+        #print(filename)
+
+r=[]
+p=[]
+for i in cor:
+    r.append(i[0])
+    p.append(i[1])
+       
+fin2=pd.DataFrame([file,r,p]).transpose()
+fin2.to_excel(r'C:\Users\hanaj\OneDrive - University of Edinburgh\0. PhD_Psyhology\0. Experiment\0. The 5th Year\Effort_individual letter_ENG_upper\0.pelli_upper_cor.xlsx')
+
